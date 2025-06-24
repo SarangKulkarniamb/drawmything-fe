@@ -1,8 +1,8 @@
-"use client";
 
-import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+
+import { HeaderMenuDesktop , HeaderMenuMobile } from '@/components/Menu';
 import { 
   Palette, 
   Users, 
@@ -12,25 +12,15 @@ import {
   Play, 
   Sparkles,
   ArrowRight,
-  Gamepad2,
   Brush,
   Timer,
-  Trophy
+  Trophy,
+  Menu, X
 } from 'lucide-react';
-import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
-export default function Home() {
-  const [isVisible, setIsVisible] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  const session = useSession();
-  useEffect(() => {
-    setIsVisible(true);
-    const interval = setInterval(() => {
-      setCurrentStep((prev) => (prev + 1) % 4);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+export default  function Home() {
+  
 
   const gameSteps = [
     { icon: Brush, title: "Draw", description: "Create your masterpiece", color: "text-blue-400" },
@@ -95,44 +85,27 @@ export default function Home() {
       
       {/* Header */}
       <header className="relative z-10 container mx-auto px-4 py-6">
-        <nav className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
-              <Gamepad2 className="w-6 h-6 text-white" />
+                  <nav className="flex items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center space-x-2">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
+                  <Brush className="w-6 h-6 text-white" />
+                </div>
+              <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                DrawMyThing
+              </span>
             </div>
-            <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              DrawMyThing
-            </span>
-          </div>
-          <div className="hidden md:flex items-center space-x-8">
-            <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
-            <a href="#how-it-works" className="text-gray-300 hover:text-white transition-colors">How It Works</a>
-            <a href="#testimonials" className="text-gray-300 hover:text-white transition-colors">Reviews</a>
 
-            { session.status === "authenticated" ? (
-                
-                <Button variant="outline" className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white">
-                  <Link href='/api/auth/signout'>
-                  Sign Out </Link>
-                </Button>
-             
-            ) : (
-              
-                <Button variant="outline" className="border-purple-500 text-purple-400 hover:bg-purple-500 hover:text-white">
-                  <Link href='/api/auth/signin'>
-                  Sign In</Link>
-                </Button>
-              
-              
-            )}
-            
-          </div>
-        </nav>
+            {/* Desktop Menu */}
+            <HeaderMenuDesktop>
+            </HeaderMenuDesktop>
+            <HeaderMenuMobile></HeaderMenuMobile>
+          </nav>
       </header>
 
       {/* Hero Section */}
       <section className="relative z-10 container mx-auto px-4 py-20 text-center">
-        <div className={`transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+        <div className="transition-all duration-1000 translate-y-10">
           <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent leading-tight">
             Draw. Guess. Laugh.
             <br />
@@ -144,8 +117,9 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <Button size="lg" className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white px-8 py-4 text-lg font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-              <Play className="w-5 h-5 mr-2" />
-              Start Playing Now
+              
+              <Link className='flex items-center' href={"/game"}><Play className="w-5 h-5 mr-2" />Start Playing Now</Link>
+              
             </Button>
             <Button size="lg" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800 px-8 py-4 text-lg font-semibold rounded-xl">
               <Users className="w-5 h-5 mr-2" />
@@ -172,9 +146,9 @@ export default function Home() {
           {gameSteps.map((step, index) => {
             const Icon = step.icon;
             return (
-              <Card key={index} className={`bg-gray-800/50 border-gray-700 backdrop-blur-lg transition-all duration-500 hover:scale-105 ${currentStep === index ? 'ring-2 ring-blue-500 shadow-lg shadow-blue-500/25' : ''}`}>
+              <Card key={index} className="bg-gray-800/50 border-gray-700 backdrop-blur-lg transition-all duration-500 hover:scale-105 ">
                 <CardContent className="p-6 text-center">
-                  <div className={`w-16 h-16 rounded-full bg-gradient-to-r from-gray-700 to-gray-600 flex items-center justify-center mx-auto mb-4 ${currentStep === index ? 'animate-pulse' : ''}`}>
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-r from-gray-700 to-gray-600 flex items-center justify-center mx-auto mb-4">
                     <Icon className={`w-8 h-8 ${step.color}`} />
                   </div>
                   <h3 className="text-xl font-semibold mb-2 text-white">{step.title}</h3>
@@ -186,13 +160,7 @@ export default function Home() {
           })}
         </div>
 
-        <div className="text-center">
-          <Button size="lg" className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white px-8 py-4 text-lg font-semibold rounded-xl">
-            <Zap className="w-5 h-5 mr-2" />
-            Try It Now
-            <ArrowRight className="w-5 h-5 ml-2" />
-          </Button>
-        </div>
+        
       </section>
 
       {/* Features Section */}
@@ -291,7 +259,7 @@ export default function Home() {
           <div>
             <div className="flex items-center space-x-2 mb-4">
               <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl">
-                <Gamepad2 className="w-6 h-6 text-white" />
+                <Brush className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 DrawChain
