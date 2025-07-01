@@ -5,21 +5,15 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from "@/components/ui/input";
 import { 
+  Clock,
   Brush, 
-  Eraser, 
-  Palette, 
-  Undo, 
-  Redo, 
-  Download, 
   Users, 
   Send,
-  Settings,
-  Timer,
-  Crown,
   MessageSquare,
   Trash2,
-  RotateCcw,LogOut
+  RotateCcw,LogOut,Crown
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSession } from "next-auth/react";
@@ -38,6 +32,8 @@ export default function RoomPage() {
   const [playerId, setPlayerId] = useState<string>("");
   const [hostId, setHostId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const [chatMessages, setChatMessages] = useState<{playerName:string , playerAvatar:string , playerId: string; message: string }[]>([]);
   const handleLeaveRoom = () => {
     if (!socket || typeof roomId !== "string") return;
 
@@ -49,10 +45,7 @@ export default function RoomPage() {
   };
   
   useEffect(() => {
-    if (!session || session.status !== "authenticated") {
-      router.push('/');
-      return;
-    }
+    
     if (!socket || typeof roomId !== "string") return;
 
     socket.onopen = () => {
@@ -64,15 +57,19 @@ export default function RoomPage() {
 
       if (msg.type === "player_list") {
         setPlayers(msg.data);
+        setHostId(msg.hostId);
       }
 
       if (msg.type === "joined_room") {
         setPlayerId(msg.data.playerId);
-        setHostId(msg.data.hostId);
       }
 
       if (msg.type === "error") {
         setError(msg.data.msg);
+      }
+      if(msg.type === "chat") {
+        setChatMessages(prev => [...prev, {playerAvatar : msg.data.playerAvatar, playerId: msg.data.playerId, playerName : msg.data.playerName, message: msg.data.message }]);
+        console.log("Chat message received:", msg.data);
       }
     };
   }, [socket, roomId]);
@@ -100,15 +97,6 @@ export default function RoomPage() {
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 bg-gray-800/50 rounded-lg px-4 py-2">
-                <Timer className="w-5 h-5 text-yellow-400" />
-                <span className="text-xl font-bold text-yellow-400">60s</span>
-              </div>
-              
-              <div className="bg-green-600/20 border border-green-500/30 rounded-lg px-4 py-2">
-                <span className="text-green-400 font-semibold">Draw: BUTTERFLY</span>
-              </div>
-              
               <Button onClick={handleLeaveRoom} variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
                 <LogOut className="w-4 h-4 mr-2" />
                 Leave Room
@@ -144,72 +132,112 @@ export default function RoomPage() {
                       ></Image>
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
-                          <span className="text-white font-medium">{player.name}</span>
+                          <span className="flex gap-4 text-white font-medium">{player.name} {player.id == hostId ? <Crown className="text-yellow-500"/>  : ""}</span>
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
-
+                {session.data?.userId ==  hostId && (
                 <Button className="w-full mt-4 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600">
                   Start Game
-                </Button>
+                </Button>)}
               </CardContent>
             </Card>
           </div>
 
-          {/* Canvas Area */}
-          <div className="lg:col-span-2">
+          {/* Waiting Area */}
+          <div className="lg:col-span-2 " >
+            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
+              <CardContent className="p-8 h-full flex flex-col items-center justify-center text-center">
+                
+                {/* Waiting Animation */}
+                <div className="w-32 h-32 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-8 animate-pulse">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center">
+                    <Clock className="w-10 h-10 text-white animate-spin" />
+                  </div>
+                </div>
+
+                <h2 className="text-3xl font-bold text-white mb-4">
+                  Waiting for Admin to Start
+                </h2>
+                
+                <p className="text-xl text-gray-300 mb-8 max-w-md">
+                  The game will begin once the room admin starts the session. Get ready to draw and guess!
+                </p>
+
+                <div className="mt-8 p-4 bg-blue-600/20 border border-blue-500/30 rounded-lg">
+                  <p className="text-blue-300 text-sm">
+                    💡 <strong>Tip:</strong> While you wait, think of some creative prompts to suggest when it's your turn!
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Chat Area */}
+          <div className="lg:col-span-1">
             <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
               <CardContent className="p-4 h-full flex flex-col">
-                
-                {/* Drawing Tools */}
-                <div className="flex items-center justify-between mb-4 p-3 bg-gray-700/50 rounded-lg">
-                  <div className="flex items-center space-x-4">
-                    {/* Tool Selection */}
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        size="sm"
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        <Brush className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                      >
-                        <Eraser className="w-4 h-4" />
-                      </Button>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center">
+                    <MessageSquare className="w-5 h-5 mr-2" />
+                    Chat
+                  </h3>
+                </div>
+
+                {/* Chat Messages */}
+                <div className="max-h-156 flex-1 overflow-y-auto space-y-3 mb-4">
+                  {chatMessages.map((msg, index) => (
+                    <div key={index} className="p-3 rounded-lg bg-gray-700/50">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <Image
+                          src={msg.playerAvatar || "/default-avatar.png"}
+                          alt="avatar"
+                          width={24}
+                          height={24}
+                          className="rounded-full"
+                        />
+                        <span className="flex gap-4 text-white font-medium">{msg.playerName} {msg.playerId == hostId ? <Crown className="text-yellow-500 text-sm"/>  : ""}</span>
+                      </div>
+                      <p className="text-white text-md">{msg.message}</p>
                     </div>
-                    
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Button size="sm" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
-                      <Undo className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-700">
-                      <Redo className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="border-red-600 text-red-400 hover:bg-red-600 hover:text-white"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  ))}
+                  
                 </div>
 
-                {/* Canvas */}
-                <div className="flex-1 bg-white rounded-lg overflow-hidden">
-                  <canvas
-                    width={800}
-                    height={600}
-                    className="w-full h-full cursor-crosshair"
+                {/* Chat Input */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!socket || !newMessage.trim()) return;
+
+                    socket.send(JSON.stringify({
+                      type: "chat_message",
+                      data: {
+                        roomId,
+                        message: newMessage
+                      }
+                    }));
+                    setNewMessage("");
+                  }}
+                  className="flex space-x-2"
+                >
+                  <Input
+                    placeholder="Say something..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    className="flex-1 bg-gray-700/50 border-gray-600 text-white placeholder-gray-400"
                   />
-                </div>
+                  <Button 
+                    type="submit" 
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </form>
+
               </CardContent>
             </Card>
           </div>

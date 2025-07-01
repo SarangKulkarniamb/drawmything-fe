@@ -16,5 +16,5 @@ export async function POST() {
     },
   });
 
-  return NextResponse.json({ roomId: room.id });
+  return NextResponse.json({ roomId: room.id , hostId: room.hostId }, { status: 200 });
 }

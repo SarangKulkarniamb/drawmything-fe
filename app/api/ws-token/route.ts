@@ -17,9 +17,11 @@ export async function GET() {
     image: session.user.image,
   };
   console.log("Generating token for user:", payload);
+  
   const token = jwt.sign(payload, process.env.WS_SECRET!, {
     expiresIn: "120m",
   });
+  console.log(token);
 
   return NextResponse.json({ token });
 }
