@@ -9,12 +9,14 @@ import {
   Send,
   Lightbulb,
   ArrowRight,
-  Timer,
 } from 'lucide-react';
-
-export default function PromptPage() {
+type PromptPageProps = {
+  socket: WebSocket|null;
+  roomId?: string|undefined;
+  round?: number;
+};
+export default function PromptPage({socket, roomId, round}: PromptPageProps) {
   const [prompt, setPrompt] = useState('');
-  const [timeLeft, setTimeLeft] = useState(45);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   
 
@@ -37,19 +39,11 @@ export default function PromptPage() {
                   DrawMyThing
                 </span>
               </div>
-              <div className="text-gray-400">Room: #ABC123</div>
+              <div className="text-gray-400">Room: {roomId}</div>
             </div>
             
-            <div className="flex items-center space-x-4">
-              <div className="bg-yellow-600/20 border border-yellow-500/30 rounded-lg px-4 py-2">
-                <span className="text-yellow-400 font-semibold flex items-center">
-                  <Timer className="w-4 h-4 mr-2" />
-                  {timeLeft}s
-                </span>
-              </div>
-              
-              <div className="text-gray-300">Round 1 of 3</div>
-            </div>
+            <div className="text-gray-300">Round {round} of 3</div>
+            
           </div>
         </div>
       </header>
@@ -100,6 +94,10 @@ export default function PromptPage() {
                   onClick={() => {
                     if (prompt.trim().length >= 5) {
                       setHasSubmitted(true);
+                      socket?.send(JSON.stringify({
+                        type: 'submission',
+                        data: { roomId:roomId, content:prompt }
+                      }));
                       console.log('Prompt submitted:', prompt);
                     }
                   }}

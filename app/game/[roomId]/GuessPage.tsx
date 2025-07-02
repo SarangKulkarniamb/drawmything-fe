@@ -1,28 +1,94 @@
 "use client";
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import * as fabric from 'fabric';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { 
-  Brush,
-  Send,
-  Timer,
-  Eye,
-  MessageSquare,
-  ArrowRight,
-  Lightbulb,
-  Users
-} from 'lucide-react';
+import { Brush, Send, Timer, Eye, MessageSquare, ArrowRight, Lightbulb, Users } from 'lucide-react';
 
-export default function GuessPage() {
+type GuessPageProps = {
+  socket: WebSocket | null;
+  roomId?: string | undefined;
+  round?: number;
+  gameData?: string | undefined;
+};
+
+export default function GuessPage({ socket, roomId, round, gameData }: GuessPageProps) {
   const [guess, setGuess] = useState('');
   const [timeLeft, setTimeLeft] = useState(30);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [canvasError, setCanvasError] = useState<string | null>(null);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fabricRef = useRef<fabric.Canvas | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!canvasRef.current || !gameData) return;
+
+    try {
+      const canvas = new fabric.Canvas(canvasRef.current, {
+        backgroundColor: '#4b5563',
+        selection: false,
+        preserveObjectStacking: true,
+        width: 800,
+        height: 600,
+      });
+
+      fabricRef.current = canvas;
+
+      const json = JSON.parse(gameData);
+      canvas.loadFromJSON(json, () => {
+        canvas.renderAll();
+
+        requestAnimationFrame(() => {
+          if (containerRef.current) {
+            canvas.setDimensions({
+              width: containerRef.current.clientWidth,
+              height: containerRef.current.clientHeight,
+            });
+          }
+        });
+      });
+
+      return () => {
+        fabricRef.current?.dispose();
+        fabricRef.current = null;
+      };
+    } catch (error) {
+      console.error('Error loading canvas:', error);
+      setCanvasError('Failed to load the drawing. Please try again.');
+    }
+  }, [gameData]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (fabricRef.current && containerRef.current) {
+        fabricRef.current.setDimensions({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const handleSubmit = () => {
-    if (guess.trim()) {
+    if (guess.trim() && !hasSubmitted) {
       setHasSubmitted(true);
+      socket?.send(
+        JSON.stringify({
+          type: 'submission',
+          data: { roomId, content: guess },
+        })
+      );
     }
   };
 
@@ -34,11 +100,9 @@ export default function GuessPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-      {/* Background Effects */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-purple-900/20 via-transparent to-transparent pointer-events-none" />
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_bottom_right,_var(--tw-gradient-stops))] from-blue-900/20 via-transparent to-transparent pointer-events-none" />
-      
-      {/* Header */}
+
       <header className="relative z-10 border-b border-gray-800 bg-gray-900/50 backdrop-blur-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -51,18 +115,11 @@ export default function GuessPage() {
                   DrawMyThing
                 </span>
               </div>
-              <div className="text-gray-400">Room: #ABC123</div>
+              <div className="text-gray-400">Room: #{roomId ?? '---'}</div>
             </div>
-            
             <div className="flex items-center space-x-4">
-              <div className="bg-orange-600/20 border border-orange-500/30 rounded-lg px-4 py-2">
-                <span className="text-orange-400 font-semibold flex items-center">
-                  <Timer className="w-4 h-4 mr-2" />
-                  {timeLeft}s
-                </span>
-              </div>
               
-              <div className="text-gray-300">Round 1 of 3</div>
+              <div className="text-gray-300">Round {round}</div>
             </div>
           </div>
         </div>
@@ -70,8 +127,6 @@ export default function GuessPage() {
 
       <div className="container mx-auto px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)]">
-          
-          {/* Drawing Display */}
           <div className="lg:col-span-2">
             <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
               <CardHeader>
@@ -84,26 +139,33 @@ export default function GuessPage() {
                 </p>
               </CardHeader>
               <CardContent className="p-4 h-full">
-                <div className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center">
-                  {/* This would contain the actual drawing image */}
-                  <div className="w-full h-full bg-gray-600 rounded-lg flex items-center justify-center">
+                <div
+                  ref={containerRef}
+                  className="w-full h-full bg-gray-700 rounded-lg flex items-center justify-center"
+                  style={{ minHeight: '500px' }}
+                >
+                  {canvasError ? (
+                    <div className="text-center p-4 text-red-400">
+                      <Eye className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                      <p className="text-lg">{canvasError}</p>
+                    </div>
+                  ) : gameData ? (
+                    <canvas ref={canvasRef} className="rounded-lg w-full h-full" />
+                  ) : (
                     <div className="text-center text-gray-400">
                       <Eye className="w-16 h-16 mx-auto mb-4 opacity-50" />
                       <p className="text-lg">Drawing will appear here</p>
-                      <p className="text-sm">Created by: Alice</p>
+                      <p className="text-sm">Waiting for artist's input...</p>
                     </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Guessing Panel */}
-          <div className="lg:col-span-1 ">
-            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full ">
+          <div className="lg:col-span-1">
+            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
               <CardContent className="p-6 h-full flex flex-col">
-                
-                {/* Instructions */}
                 <div className="mb-6 p-4 bg-gradient-to-r from-purple-600/20 to-blue-600/20 border border-purple-500/30 rounded-lg">
                   <h3 className="text-lg font-semibold text-white mb-2 flex items-center">
                     <Lightbulb className="w-5 h-5 mr-2 text-yellow-400" />
@@ -114,7 +176,6 @@ export default function GuessPage() {
                   </p>
                 </div>
 
-                {/* Guess Input */}
                 {!hasSubmitted ? (
                   <div className="space-y-4 flex-1">
                     <div>
@@ -139,8 +200,7 @@ export default function GuessPage() {
                         </span>
                       </div>
                     </div>
-
-                    <Button 
+                    <Button
                       className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-4 text-lg"
                       onClick={handleSubmit}
                       disabled={guess.trim().length < 2}
@@ -149,18 +209,13 @@ export default function GuessPage() {
                       Submit Guess
                       <ArrowRight className="w-5 h-5 ml-2" />
                     </Button>
-
-                    
                   </div>
                 ) : (
-                  
                   <div className="flex-1 flex flex-col items-center justify-center text-center">
                     <div className="w-20 h-20 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 flex items-center justify-center mx-auto mb-6">
                       <Send className="w-10 h-10 text-white" />
                     </div>
-                    <h3 className="text-2xl font-bold text-white mb-4">
-                      Guess Submitted!
-                    </h3>
+                    <h3 className="text-2xl font-bold text-white mb-4">Guess Submitted!</h3>
                     <div className="bg-gray-700/50 rounded-lg p-4 mb-6 w-full">
                       <p className="text-gray-300 text-sm mb-2">Your guess:</p>
                       <p className="text-white font-semibold text-lg">"{guess}"</p>
@@ -168,7 +223,6 @@ export default function GuessPage() {
                     <p className="text-gray-300 mb-6">
                       Waiting for other players to finish guessing...
                     </p>
-                    
                   </div>
                 )}
               </CardContent>

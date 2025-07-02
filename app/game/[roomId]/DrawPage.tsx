@@ -25,8 +25,13 @@ import {
   Move,
   Eraser
 } from 'lucide-react';
-
-export default function DrawPage() {
+type DrawPageProps = {
+  socket: WebSocket|null;
+  roomId?: string|undefined;
+  round?: number;
+  gameData?: string|undefined;
+};
+export default function DrawPage({socket, roomId, round, gameData}: DrawPageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<fabric.Canvas | null>(null);
   
@@ -35,7 +40,7 @@ export default function DrawPage() {
   const [currentColor, setCurrentColor] = useState('#000000');
   const [brushSize, setBrushSize] = useState(5);
   const [timeLeft, setTimeLeft] = useState(60);
-
+  const [submitted, setSubmitted] = useState(false);
   const colors = [
     '#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff',
     '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#800080',
@@ -43,7 +48,7 @@ export default function DrawPage() {
   ];
 
   const brushSizes = [2, 4, 8, 12, 20, 30];
-  const prompt = "A cat trying to use a computer";
+  const prompt = gameData;
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -192,18 +197,36 @@ export default function DrawPage() {
       fabricRef.current.remove(objects[objects.length - 1]);
     }
   };
-
+  
   const downloadCanvas = () => {
-    /*if (!fabricRef.current) return;
+    if (!fabricRef.current) return;
     const dataURL = fabricRef.current.toDataURL({
       format: 'png',
       quality: 1,
+      multiplier: 1,
+      enableRetinaScaling: false,
     });
     const link = document.createElement('a');
     link.download = 'drawing.png';
     link.href = dataURL;
-    link.click();*/
+    link.click();
   };
+
+  const submitDrawing = () => {
+    console.log("Submitting drawing...");
+    if (!fabricRef.current) return;
+    const json = fabricRef.current.toJSON();
+    const jsonString = JSON.stringify(json);
+    socket?.send(JSON.stringify({
+      type: 'submission',
+      data: { roomId, content: jsonString }
+    }));
+    setSubmitted(true);
+    console.log("Drawing submitted:", jsonString);
+    fabricRef.current.isDrawingMode = false;
+    fabricRef.current.selection = false;
+    fabricRef.current.forEachObject((obj) => obj.selectable = false);
+  }
 
   return (
     <div className="h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex flex-col">
@@ -224,18 +247,12 @@ export default function DrawPage() {
                   DrawMyThing
                 </span>
               </div>
-              <div className="text-gray-400 text-sm">Room: #ABC123</div>
+              <div className="text-gray-400 text-sm">Room: {roomId}</div>
             </div>
             
             <div className="flex items-center space-x-4">
-              <div className="bg-red-600/20 border border-red-500/30 rounded-lg px-3 py-1">
-                <span className="text-red-400 font-semibold flex items-center text-sm">
-                  <Timer className="w-4 h-4 mr-1" />
-                  {timeLeft}s
-                </span>
-              </div>
               
-              <div className="text-gray-300 text-sm">Round 1 of 3</div>
+              <div className="text-gray-300 text-sm">Round {round}</div>
             </div>
           </div>
         </div>
@@ -245,8 +262,9 @@ export default function DrawPage() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
           
           {/* Drawing Tools Panel */}
+          {/* Drawing Tools Panel */}
           <div className="lg:col-span-1">
-            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
+            <Card className={`bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full ${submitted ? 'opacity-50' : ''}`}>
               <CardContent className="p-3 h-full overflow-y-auto">
                 
                 {/* Prompt Display */}
@@ -254,6 +272,13 @@ export default function DrawPage() {
                   <h3 className="text-sm font-semibold text-white mb-1">Draw This:</h3>
                   <p className="text-blue-300 font-medium text-xs">{prompt}</p>
                 </div>
+
+                {submitted && (
+                  <div className="mb-4 p-3 bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-lg">
+                    <h3 className="text-sm font-semibold text-green-400 mb-1">✓ Drawing Submitted!</h3>
+                    <p className="text-green-300 font-medium text-xs">Tools are now disabled</p>
+                  </div>
+                )}
 
                 {/* Main Tools */}
                 <div className="space-y-4">
@@ -268,14 +293,16 @@ export default function DrawPage() {
                         size="sm"
                         className={`text-xs p-2 ${currentTool === 'pencil' ? 'bg-purple-600 hover:bg-purple-700' : 'border-gray-600 text-gray-300 hover:bg-gray-700'}`}
                         onClick={() => setTool('pencil')}
+                        disabled={submitted}
                       >
                         <Brush className="w-3 h-3" />
                       </Button>
                       <Button
-                        variant={currentTool === 'pencil' ? 'default' : 'outline'}
+                        variant={currentTool === 'eraser' ? 'default' : 'outline'}
                         size="sm"
                         className={`text-xs p-2 ${currentTool === 'eraser' ? 'bg-purple-600 hover:bg-purple-700' : 'border-gray-600 text-gray-300 hover:bg-gray-700'}`}
                         onClick={() => setTool('eraser')}
+                        disabled={submitted}
                       >
                         <Eraser className="w-3 h-3" />
                       </Button>
@@ -284,6 +311,7 @@ export default function DrawPage() {
                         size="sm"
                         className={`text-xs p-2 ${currentTool === 'select' ? 'bg-purple-600 hover:bg-purple-700' : 'border-gray-600 text-gray-300 hover:bg-gray-700'}`}
                         onClick={() => setTool('select')}
+                        disabled={submitted}
                       >
                         <Move className="w-3 h-3" />
                       </Button>
@@ -299,6 +327,7 @@ export default function DrawPage() {
                         size="sm"
                         className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs p-2"
                         onClick={addRectangleStroke}
+                        disabled={submitted}
                       >
                         <Square className="w-3 h-3" />
                       </Button>
@@ -307,6 +336,7 @@ export default function DrawPage() {
                         size="sm"
                         className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs p-2"
                         onClick={addRectangleFilled}
+                        disabled={submitted}
                       >
                         <FontAwesomeIcon icon={faSquare} />
                       </Button>
@@ -315,6 +345,7 @@ export default function DrawPage() {
                         size="sm"
                         className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs p-2"
                         onClick={addCircleStroke}
+                        disabled={submitted}
                       >
                         <Circle className="w-3 h-3" />
                       </Button>
@@ -323,6 +354,7 @@ export default function DrawPage() {
                         size="sm"
                         className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs p-2"
                         onClick={addCircleFilled}
+                        disabled={submitted}
                       >
                         <FontAwesomeIcon icon={faCircle} />
                       </Button>
@@ -331,6 +363,7 @@ export default function DrawPage() {
                         size="sm"
                         className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs p-2"
                         onClick={addLine}
+                        disabled={submitted}
                       >
                         <Minus className="w-3 h-3" />
                       </Button>
@@ -351,9 +384,10 @@ export default function DrawPage() {
                           key={color}
                           className={`w-6 h-6 rounded-full border transition-all hover:scale-110 ${
                             currentColor === color ? 'border-white border-2 shadow-lg' : 'border-gray-600'
-                          }`}
+                          } ${submitted ? 'cursor-not-allowed opacity-50' : ''}`}
                           style={{ backgroundColor: color }}
-                          onClick={() => setCurrentColor(color)}
+                          onClick={() => !submitted && setCurrentColor(color)}
+                          disabled={submitted}
                         />
                       ))}
                     </div>
@@ -366,11 +400,12 @@ export default function DrawPage() {
                     </h4>
                     <Slider
                       value={[brushSize]}
-                      onValueChange={(value) => setBrushSize(value[0])}
+                      onValueChange={(value) => !submitted && setBrushSize(value[0])}
                       max={30}
                       min={1}
                       step={1}
                       className="mb-2"
+                      disabled={submitted}
                     />
                     <div className="grid grid-cols-3 gap-1">
                       {brushSizes.map((size) => (
@@ -380,6 +415,7 @@ export default function DrawPage() {
                           size="sm"
                           className={`text-xs p-1 ${brushSize === size ? 'bg-blue-600 hover:bg-blue-700' : 'border-gray-600 text-gray-300 hover:bg-gray-700'}`}
                           onClick={() => setBrushSize(size)}
+                          disabled={submitted}
                         >
                           {size}
                         </Button>
@@ -397,6 +433,7 @@ export default function DrawPage() {
                         size="sm"
                         className="border-gray-600 text-gray-300 hover:bg-gray-700 text-xs p-2"
                         onClick={undo}
+                        disabled={submitted}
                       >
                         <Undo className="w-3 h-3" />
                       </Button>
@@ -414,18 +451,30 @@ export default function DrawPage() {
                       variant="outline"
                       className="w-full border-gray-600 text-gray-300 hover:bg-gray-700 text-xs py-2"
                       onClick={clearCanvas}
+                      disabled={submitted}
                     >
                       <RotateCcw className="w-3 h-3 mr-1" />
                       Clear
                     </Button>
                     
-                    <Button 
-                      className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-sm py-2"
-                    >
-                      <Send className="w-4 h-4 mr-1" />
-                      Submit
-                      <ArrowRight className="w-4 h-4 ml-1" />
-                    </Button>
+                    {!submitted ? (
+                      <Button 
+                        onClick={submitDrawing}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-sm py-2"
+                      >
+                        <Send className="w-4 h-4 mr-1" />
+                        Submit
+                        <ArrowRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full bg-gray-600 text-gray-400 cursor-not-allowed text-sm py-2"
+                        disabled
+                      >
+                        <Send className="w-4 h-4 mr-1" />
+                        Submitted
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -433,7 +482,8 @@ export default function DrawPage() {
           </div>
 
           {/* Canvas Area */}
-          <div className="lg:col-span-4">
+          {submitted ? (
+            <div className="lg:col-span-4">
             <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-bold text-white text-center flex items-center justify-center">
@@ -451,7 +501,28 @@ export default function DrawPage() {
                 </div>
               </CardContent>
             </Card>
+          </div>) : (
+          <div className="lg:col-span-4">
+            <Card className="bg-gray-800/50 border-gray-700 backdrop-blur-lg h-full">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-bold text-white text-center flex items-center justify-center">
+                  
+                  <Palette className="w-4 h-4 mr-2" />
+                  Your Canvas
+                  </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 h-full">
+                    <div className="w-full h-full flex items-center justify-center bg-gray-700 rounded-lg overflow-hidden">
+                      <canvas
+                        ref={canvasRef}
+                        className="border border-gray-600 rounded"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
           </div>
+          )}
+          
         </div>
       </div>
     </div>
